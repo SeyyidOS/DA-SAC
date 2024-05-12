@@ -3,6 +3,7 @@ from gym import spaces
 import numpy as np
 from src.models.dsac.sac import DSAC
 
+
 class CustomAtariEnv(gym.Wrapper):
     def __init__(self, **kwargs):
         super(CustomAtariEnv, self).__init__(gym.make(**kwargs))
