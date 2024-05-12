@@ -1,6 +1,7 @@
 from typing import Dict, Type
 from stable_baselines3 import A2C, DDPG, DQN, PPO, SAC, TD3
 from stable_baselines3.common.base_class import BaseAlgorithm
+from src.models.dsac.sac import DSAC
 
 import glob
 import os
@@ -12,6 +13,7 @@ ALGOS: Dict[str, Type[BaseAlgorithm]] = {
     "ppo": PPO,
     "sac": SAC,
     "td3": TD3,
+    "dsac": DSAC,
 }
 
 def get_latest_run_id(log_path: str, env_name: str) -> int:
