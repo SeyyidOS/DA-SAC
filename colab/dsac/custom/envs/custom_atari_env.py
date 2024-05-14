@@ -9,6 +9,7 @@ from stable_baselines3.common.atari_wrappers import AtariWrapper
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.vec_env import DummyVecEnv, VecTransposeImage
+from custom.models.custom_features_extractor import CustomCNN
 
 
 class CustomAtariEnv(gym.Wrapper):
@@ -47,5 +48,12 @@ if __name__ == '__main__':
                                  log_path="/logs/", eval_freq=100,
                                  deterministic=True, render=False)
 
-    model = SAC('CnnPolicy', train_env, buffer_size=10000, learning_starts=1000, verbose=0)
+    policy_kwargs = dict(
+        features_extractor_class=CustomCNN,
+        features_extractor_kwargs=dict(features_dim=256, attention_type='lka')
+    )
+
+    model = SAC('CnnPolicy', train_env, buffer_size=10000, learning_starts=0,
+                policy_kwargs=policy_kwargs,
+                verbose=0)
     model.learn(100000, progress_bar=True, callback=eval_callback)
