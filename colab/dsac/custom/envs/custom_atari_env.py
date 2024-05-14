@@ -1,8 +1,11 @@
-import gym
+import gymnasium as gym
 import numpy as np
 from custom.models.dsac.sac import DSAC
 from custom.spaces.custom_box import CustomBox
-from custom.wrappers.atari_wrapper import AtariWrapper
+from gymnasium.spaces.box import Box
+from stable_baselines3 import SAC
+# from custom.wrappers.atari_wrapper import AtariWrapper
+from stable_baselines3.common.atari_wrappers import AtariWrapper
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.vec_env import DummyVecEnv, VecTransposeImage
@@ -12,10 +15,13 @@ class CustomAtariEnv(gym.Wrapper):
     def __init__(self, **kwargs):
         super(CustomAtariEnv, self).__init__(gym.make(**kwargs))
 
-        self.action_space = CustomBox(low=-1.0, high=1.0, shape=(2,), dtype=np.float32)
+        self.action_space = Box(low=0, high=4, shape=(1,), dtype=np.float32)
 
     def step(self, action):
-        return self.env.step(int(np.argmax(action)))
+        # return self.env.step(int(np.argmax(action)))
+        if type(action) == int:
+            return self.env.step(action)
+        return self.env.step(min(int(np.ceil(action[0])), 3))
 
 
 def make_env(id, n_train_envs, n_eval_envs):
@@ -35,11 +41,11 @@ def make_env(id, n_train_envs, n_eval_envs):
 
 
 if __name__ == '__main__':
-    train_env, eval_env = make_env('BreakoutNoFrameskip-v4', 5, 1)
+    train_env, eval_env = make_env('BreakoutNoFrameskip-v4', 1, 1)
 
     eval_callback = EvalCallback(eval_env, best_model_save_path="/logs/",
                                  log_path="/logs/", eval_freq=100,
                                  deterministic=True, render=False)
 
-    model = DSAC('CnnPolicy', train_env, buffer_size=10000, verbose=0)
+    model = SAC('CnnPolicy', train_env, buffer_size=10000, learning_starts=1000, verbose=0)
     model.learn(100000, progress_bar=True, callback=eval_callback)
