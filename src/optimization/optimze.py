@@ -1,5 +1,6 @@
 from optuna.pruners import BasePruner, MedianPruner, NopPruner, SuccessiveHalvingPruner
 from optuna.samplers import BaseSampler, RandomSampler, TPESampler
+from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.callbacks import EvalCallback
 from src.models.custom_features_extractor import CustomCNN
 from src.optimization.sampler import sample_sac_params
@@ -15,11 +16,7 @@ import optuna
 def objective_function(trial: optuna.Trial, env, n_env, n_timesteps, eval_freq, attention_type):
     sampled_hyperparams = sample_sac_params(trial)
 
-    train_env, eval_env = make_env(env, n_env, 1)
-
-    eval_callback = EvalCallback(eval_env, best_model_save_path="src/logs/",
-                                 log_path="src/logs/", eval_freq=eval_freq,
-                                 deterministic=True, render=False)
+    train_env, eval_env = make_env(env, n_env, 10)
 
     policy_kwargs = dict(
         features_extractor_class=CustomCNN,
@@ -37,11 +34,13 @@ def objective_function(trial: optuna.Trial, env, n_env, n_timesteps, eval_freq, 
     model = SAC('CnnPolicy', train_env,
                 verbose=0,
                 **sampled_hyperparams)
-    model.learn(n_timesteps, progress_bar=True, callback=eval_callback)
+    model.learn(n_timesteps, progress_bar=True)
 
-    reward = eval_callback.last_mean_reward
+    mean_reward, std_reward = evaluate_policy(model, eval_env, n_eval_episodes=10)
 
-    return reward
+    del eval_env
+
+    return mean_reward
 
 
 def optimize(env='BreakoutNoFrameskip-v4', n_env=5, n_trials=10, n_timesteps=100, eval_freq=100, attention_type='csa'):
