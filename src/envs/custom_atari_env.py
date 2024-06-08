@@ -23,7 +23,7 @@ class CustomAtariEnv(gym.Wrapper):
 def make_env(id, n_train_envs, n_eval_envs):
     def _make_env():
         env = CustomAtariEnv(id=id)
-        env = Monitor(env, filename="/logs/")
+        env = Monitor(env, filename="src/logs/")
         env = AtariWrapper(env)
         return env
 

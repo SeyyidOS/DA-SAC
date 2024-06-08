@@ -8,8 +8,8 @@ from stable_baselines3 import SAC
 def train():
     train_env, eval_env = make_env('BreakoutNoFrameskip-v4', 1, 1)
 
-    eval_callback = EvalCallback(eval_env, best_model_save_path="/logs/",
-                                 log_path="/logs/", eval_freq=100,
+    eval_callback = EvalCallback(eval_env, best_model_save_path="src/logs/",
+                                 log_path="src/logs/", eval_freq=100,
                                  deterministic=True, render=False)
 
     policy_kwargs = dict(

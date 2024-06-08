@@ -17,8 +17,8 @@ def objective_function(trial: optuna.Trial, env, n_env, n_timesteps, eval_freq, 
 
     train_env, eval_env = make_env(env, n_env, 1)
 
-    eval_callback = EvalCallback(eval_env, best_model_save_path="/logs/",
-                                 log_path="/logs/", eval_freq=eval_freq,
+    eval_callback = EvalCallback(eval_env, best_model_save_path="src/logs/",
+                                 log_path="src/logs/", eval_freq=eval_freq,
                                  deterministic=True, render=False)
 
     policy_kwargs = dict(
@@ -74,7 +74,7 @@ def optimize(env='BreakoutNoFrameskip-v4', n_env=5, n_trials=10, n_timesteps=100
         sampler=_create_sampler('tpe'),
         pruner=_create_pruner('median'),
         direction="maximize",
-        storage=f'sqlite:///data/optimization.db',
+        storage=f'sqlite:///src/data/optimization.db',
         study_name=f'{env}_{attention_type}',
         load_if_exists=True
     )
@@ -87,4 +87,4 @@ def optimize(env='BreakoutNoFrameskip-v4', n_env=5, n_trials=10, n_timesteps=100
 
     folder_name = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
 
-    study.trials_dataframe().to_csv(f"logs/optimization/optimization_log_{env}_{attention_type}_{folder_name}.csv")
+    study.trials_dataframe().to_csv(f"src/logs/optimization/optimization_log_{env}_{attention_type}_{folder_name}.csv")
