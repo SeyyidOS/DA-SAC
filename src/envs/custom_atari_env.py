@@ -1,10 +1,7 @@
 from stable_baselines3.common.vec_env import DummyVecEnv, VecTransposeImage
 from stable_baselines3.common.atari_wrappers import AtariWrapper
-from stable_baselines3.common.callbacks import EvalCallback
-from src.models.custom_features_extractor import CustomCNN
 from stable_baselines3.common.monitor import Monitor
 from gymnasium.spaces.box import Box
-from stable_baselines3 import SAC
 
 import gymnasium as gym
 import numpy as np
@@ -37,6 +34,3 @@ def make_env(id, n_train_envs, n_eval_envs):
     eval_env = VecTransposeImage(eval_env)
 
     return train_env, eval_env
-
-
-

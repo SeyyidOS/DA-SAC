@@ -2,10 +2,12 @@ from optuna.pruners import BasePruner, MedianPruner, NopPruner, SuccessiveHalvin
 from optuna.samplers import BaseSampler, RandomSampler, TPESampler
 from stable_baselines3.common.callbacks import EvalCallback
 from src.models.custom_features_extractor import CustomCNN
-from src.envs.custom_atari_env import make_env
 from src.optimization.sampler import sample_sac_params
+from src.envs.custom_atari_env import make_env
 from stable_baselines3 import SAC
 from datetime import datetime
+import sqlite3
+import os.path
 
 import optuna
 
@@ -42,7 +44,7 @@ def objective_function(trial: optuna.Trial, env, n_env, n_timesteps, eval_freq, 
     return reward
 
 
-def optimize(env='BreakoutNoFrameskip-v4', n_env=5, n_timesteps=100, eval_freq=100, attention_type='csa'):
+def optimize(env='BreakoutNoFrameskip-v4', n_env=5, n_trials=10, n_timesteps=100, eval_freq=100, attention_type='csa'):
     def _create_sampler(sampler_method: str):
         # n_warmup_steps: Disable pruner until the trial reaches the given number of steps.
         if sampler_method == "random":
@@ -72,18 +74,17 @@ def optimize(env='BreakoutNoFrameskip-v4', n_env=5, n_timesteps=100, eval_freq=1
         sampler=_create_sampler('tpe'),
         pruner=_create_pruner('median'),
         direction="maximize",
+        storage=f'sqlite:///data/optimization.db',
+        study_name=f'{env}_{attention_type}',
+        load_if_exists=True
     )
 
     try:
         study.optimize(lambda trial: objective_function(trial, env, n_env, n_timesteps, eval_freq, attention_type),
-                       n_trials=10)
+                       n_trials=n_trials)
     except:
         pass
 
     folder_name = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
 
-    study.trials_dataframe().to_csv(f"optimization_log_{env}_{attention_type}_{folder_name}.csv")
-
-
-if __name__ == '__main__':
-    optimize()
+    study.trials_dataframe().to_csv(f"logs/optimization/optimization_log_{env}_{attention_type}_{folder_name}.csv")

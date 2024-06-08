@@ -25,4 +25,4 @@ def train():
 
 if __name__ == '__main__':
     # train()
-    optimize()
+    optimize(env='Krull-v4', n_env=20, n_trials=4, n_timesteps=100_000, eval_freq=5000, attention_type='csa')
