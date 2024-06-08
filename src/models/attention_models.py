@@ -2,7 +2,72 @@ import torch.nn.functional as F
 import torch.nn.init as init
 import torch.nn as nn
 import torch
+import math
 
+class DenseAttention(nn.Module):
+    def __init__(self, in_features, out_features, hidden_dim=None, bias=True):
+        super(DenseAttention, self).__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.hidden_dim = hidden_dim or in_features
+
+        self.key_dense = nn.Linear(in_features, self.hidden_dim, bias=bias)
+        self.query_dense = nn.Linear(in_features, self.hidden_dim, bias=bias)
+        self.value_dense = nn.Linear(in_features, self.hidden_dim, bias=bias)
+        self.output_dense = nn.Linear(self.hidden_dim, out_features, bias=bias)
+
+        self.reset_parameters()
+
+    def forward(self, x):
+        batch_size, seq_len = x.size()
+
+        # Compute key, query, value
+        k = self.key_dense(x)  # (batch_size, seq_len, hidden_dim)
+        q = self.query_dense(x)  # (batch_size, seq_len, hidden_dim)
+        v = self.value_dense(x)  # (batch_size, seq_len, hidden_dim)
+
+        # Compute attention scores
+
+        attn_scores = q.T @ k
+        # attn_scores = torch.bmm(q, k.transpose(0, 1))  # (batch_size, seq_len, seq_len)
+        attn_scores = attn_scores / (self.hidden_dim ** 0.5)
+        attn_weights = F.softmax(attn_scores, dim=-1)  # (batch_size, seq_len, seq_len)
+
+        # Apply attention weights to value
+        attn_output = attn_weights @ v.T
+        # attn_output = torch.bmm(attn_weights, v)  # (batch_size, seq_len, hidden_dim)
+
+        attn_output = torch.reshape(attn_output, (batch_size, -1))
+        # Final linear projection
+        output = self.output_dense(attn_output)  # (batch_size, seq_len, out_features)
+
+        return output
+
+    def reset_parameters(self):
+        nn.init.kaiming_uniform_(self.key_dense.weight, a=math.sqrt(5))
+        nn.init.kaiming_uniform_(self.query_dense.weight, a=math.sqrt(5))
+        nn.init.kaiming_uniform_(self.value_dense.weight, a=math.sqrt(5))
+        nn.init.kaiming_uniform_(self.output_dense.weight, a=math.sqrt(5))
+
+        if self.key_dense.bias is not None:
+            fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.key_dense.weight)
+            bound = 1 / math.sqrt(fan_in)
+            nn.init.uniform_(self.key_dense.bias, -bound, bound)
+
+        if self.query_dense.bias is not None:
+            fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.query_dense.weight)
+            bound = 1 / math.sqrt(fan_in)
+            nn.init.uniform_(self.query_dense.bias, -bound, bound)
+
+        if self.value_dense.bias is not None:
+            fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.value_dense.weight)
+            bound = 1 / math.sqrt(fan_in)
+            nn.init.uniform_(self.value_dense.bias, -bound, bound)
+
+        if self.output_dense.bias is not None:
+            fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.output_dense.weight)
+            bound = 1 / math.sqrt(fan_in)
+            nn.init.uniform_(self.output_dense.bias, -bound, bound)
 
 class LargeKernelAttention(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, groups=1, bias=False):
@@ -75,57 +140,6 @@ class LargeKernelAttention(nn.Module):
         out = self.large_kernel_conv(out)
 
         return out
-
-
-class DenseAttention(nn.Module):
-    def __init__(self, in_features, out_features, num_heads=1, bias=False):
-        super(DenseAttention, self).__init__()
-        self.num_heads = num_heads
-        self.out_features = out_features
-        self.head_dim = out_features // num_heads
-
-        assert self.out_features % self.num_heads == 0, "out_features should be divisible by num_heads."
-
-        self.query_linear = nn.Linear(in_features, out_features, bias=bias)
-        self.key_linear = nn.Linear(in_features, out_features, bias=bias)
-        self.value_linear = nn.Linear(in_features, out_features, bias=bias)
-
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        nn.init.xavier_uniform_(self.query_linear.weight)
-        nn.init.xavier_uniform_(self.key_linear.weight)
-        nn.init.xavier_uniform_(self.value_linear.weight)
-        if self.query_linear.bias is not None:
-            nn.init.constant_(self.query_linear.bias, 0)
-        if self.key_linear.bias is not None:
-            nn.init.constant_(self.key_linear.bias, 0)
-        if self.value_linear.bias is not None:
-            nn.init.constant_(self.value_linear.bias, 0)
-
-    def forward(self, x):
-        batch_size, channels, height, width = x.size()
-        num_pixels = height * width
-
-        # Flatten spatial dimensions
-        x = x.view(batch_size, channels, num_pixels).permute(0, 2, 1)  # (batch_size, num_pixels, channels)
-
-        q_out = self.query_linear(x)  # (batch_size, num_pixels, out_features)
-        k_out = self.key_linear(x)  # (batch_size, num_pixels, out_features)
-        v_out = self.value_linear(x)  # (batch_size, num_pixels, out_features)
-
-        q_out = q_out.view(batch_size, num_pixels, self.num_heads, self.head_dim).transpose(1, 2)
-        k_out = k_out.view(batch_size, num_pixels, self.num_heads, self.head_dim).transpose(1, 2)
-        v_out = v_out.view(batch_size, num_pixels, self.num_heads, self.head_dim).transpose(1, 2)
-
-        scores = torch.matmul(q_out, k_out.transpose(-2, -1)) / self.head_dim ** 0.5
-        attn_weights = F.softmax(scores, dim=-1)
-
-        context = torch.matmul(attn_weights, v_out)  # (batch_size, num_heads, num_pixels, head_dim)
-        context = context.transpose(1, 2).contiguous().view(batch_size, num_pixels, self.out_features)
-        context = context.permute(0, 2, 1).view(batch_size, self.out_features, height, width)
-
-        return context
 
 
 class AttentionConv(nn.Module):

@@ -1,27 +1,28 @@
-from src.args import get_args
-import mlflow
+from stable_baselines3.common.callbacks import EvalCallback
+from src.models.custom_features_extractor import CustomCNN
+from src.envs.custom_atari_env import make_env
+from src.optimization.optimze import optimize
+from stable_baselines3 import SAC
 
 
-def main():
-    args, exp_manager = get_args()
+def train():
+    train_env, eval_env = make_env('BreakoutNoFrameskip-v4', 1, 1)
 
-    if args.track:
-        mlflow.set_experiment(args.experiment_name)
-        mlflow.set_tracking_uri(args.tracking_uri)
-        mlflow.start_run()
+    eval_callback = EvalCallback(eval_env, best_model_save_path="/logs/",
+                                 log_path="/logs/", eval_freq=100,
+                                 deterministic=True, render=False)
 
-    results = exp_manager.setup_experiment()
-    if results is not None:
-        model, saved_hyperparams = results
-        if args.track:
-            mlflow.log_params(saved_hyperparams)
+    policy_kwargs = dict(
+        features_extractor_class=CustomCNN,
+        features_extractor_kwargs=dict(features_dim=256, attention_type='csa')
+    )
 
-        if model is not None:
-            exp_manager.learn(model)
-            exp_manager.save_trained_model(model)
-    else:
-        exp_manager.hyperparameters_optimization()
+    model = SAC('CnnPolicy', train_env, buffer_size=10000, learning_starts=0,
+                policy_kwargs=policy_kwargs,
+                verbose=0)
+    model.learn(100000, progress_bar=True, callback=eval_callback)
 
 
 if __name__ == '__main__':
-    main()
+    # train()
+    optimize()

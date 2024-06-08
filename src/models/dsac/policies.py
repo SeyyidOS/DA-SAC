@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union
 import torch as th
 from gymnasium import spaces
 from torch import nn
+import torch.nn.functional as F
 
 from stable_baselines3.common.distributions import SquashedDiagGaussianDistribution, StateDependentNoiseDistribution
 from stable_baselines3.common.policies import BasePolicy, ContinuousCritic
@@ -99,8 +100,10 @@ class Actor(BasePolicy):
                 self.mu = nn.Sequential(self.mu, nn.Hardtanh(min_val=-clip_mean, max_val=clip_mean))
         else:
             self.action_dist = SquashedDiagGaussianDistribution(action_dim)  # type: ignore[assignment]
-            self.mu = nn.Linear(last_layer_dim, action_dim)
-            self.log_std = nn.Linear(last_layer_dim, action_dim)  # type: ignore[assignment]
+            # self.mu = nn.Linear(last_layer_dim, action_dim)
+            # self.log_std = nn.Linear(last_layer_dim, action_dim)  # type: ignore[assignment]
+
+            self.da = nn.Linear(last_layer_dim, action_dim)
 
     def _get_constructor_parameters(self) -> Dict[str, Any]:
         data = super()._get_constructor_parameters()
@@ -154,13 +157,18 @@ class Actor(BasePolicy):
         """
         features = self.extract_features(obs, self.features_extractor)
         latent_pi = self.latent_pi(features)
-        mean_actions = self.mu(latent_pi)
+        # mean_actions = self.mu(latent_pi)
+        da_logits = self.da(latent_pi)
+
+        mean_actions = F.gumbel_softmax(da_logits, tau=0.8, hard=False)
 
         if self.use_sde:
             return mean_actions, self.log_std, dict(latent_sde=latent_pi)
         # Unstructured exploration (Original implementation)
-        log_std = self.log_std(latent_pi)  # type: ignore[operator]
+        # log_std = self.log_std(latent_pi)  # type: ignore[operator]
         # Original Implementation to cap the standard deviation
+
+        log_std = th.log(mean_actions)
         log_std = th.clamp(log_std, LOG_STD_MIN, LOG_STD_MAX)
         return mean_actions, log_std, {}
 
